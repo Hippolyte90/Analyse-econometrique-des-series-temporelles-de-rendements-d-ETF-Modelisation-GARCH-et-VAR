@@ -1,0 +1,209 @@
+set verbose off
+include yahoo_get.gfn
+
+# sample function calls
+
+nulldata 1972 # à augmenter après
+setobs 5 2017-05-05  # a daily dataset should be already in place
+delete index
+
+
+
+series AEME = yahoo_price("AEME.PA", 2)  # fill gaps by interpolation
+series CG9 = yahoo_price("CG9.PA", 2)  # fill gaps by interpolation
+series CV9 = yahoo_price("CV9.PA", 2)  # fill gaps by interpolation
+   
+
+#######################################
+## Exercice 1
+#######################################
+
+## a. Caractéristiques
+
+
+## b. Représentez graphiquement l'évolution de la valeur de vos ETFs et du portefeuille P
+
+
+
+series AEME100 = AEME / AEME[1] * 100
+series CG9100 = CG9 / CG9[1] * 100
+series CV9100 = CV9 / CV9[1] * 100
+
+# Plot the normalized values
+gnuplot  AEME100 CG9100 CV9100 --time-series --with-lines --output=display 
+
+########################################
+## Exercice 2
+########################################
+
+#Rendements géométriques
+ldiff  AEME100 CG9100 CV9100
+
+genr rAEME = ld_AEME100
+genr rCG9 = ld_CG9100
+genr rCV9 = ld_CV9100
+
+
+## a- les statistiques descriptives des rendements géométriques
+
+
+summary rAEME
+summary rCG9
+summary rCV9
+
+## b- L'histogramme de la distribution
+
+freq rAEME --nbins=51 --normal --silent --plot=display
+freq rCG9 --nbins=51 --normal --silent --plot=display
+freq rCV9 --nbins=51 --normal --silent --plot=display
+
+## Le graphique QQ
+
+qqplot rAEME --output=display
+qqplot rCG9 --output=display
+qqplot rCV9 --output=display
+
+## Test de normalité de Jarque-Bera
+
+
+scalar nobs = $nobs
+
+scalar m_rAEME= mean(rAEME)
+scalar m_rCG9= mean(rCG9)
+scalar m_rCV9 = mean(rCV9)
+
+scalar sd_rAEME = sd(rAEME)
+scalar sd_rCG9 = sd(rCG9)
+scalar m_rCV9 = sd(rCV9)
+
+scalar sk_rAEME = skewness(rAEME)
+scalar sk_rCG9 = skewness(rCG9)
+scalar sk_rCV9 = skewness(rCV9)
+
+scalar ku_rAEME = kurtosis(rAEME)
+scalar ku_rCG9 = kurtosis(rCG9)
+scalar ku_rCV9 = kurtosis(rCV9)
+
+# Statistique JB (v.c. 3,86)
+
+scalar JB_rAEME = ((nobs-2)/6)*(sk_rAEME^2 + 0.25*ku_rAEME^2)# ku kutosis coefficient
+scalar JB_rCG9 = ((nobs-2)/6)*(sk_rCG9^2 + 0.25*ku_rCG9^2) # shewness coedfficient
+scalar JB_rCV9 = ((nobs-2)/6)*(sk_rCV9^2 + 0.25*ku_rCV9^2)
+
+# Affichage des résultats
+
+printf "JB_rAEME = %.8g\n", JB_rAEME
+printf "JB_rCG9 = %.8g\n", JB_rCG9
+printf "JB_rCV9 = %.8g\n", JB_rCV9
+
+
+
+## c- la matrice des corrélations entre les rendements des 3 ETF. 
+
+
+corr rAEME rCG9 rCV9
+
+## d- Fonctions d'autocorrélation des rendements des rendements 
+
+
+corrgm rAEME --plot=display
+corrgm rCG9 --plot=display 
+corrgm rCV9 --plot=display
+
+####################################################
+## Exercice 3
+####################################################
+
+
+##  Ici, nous travaillons avec les deux premiers ETF AEME.PA et CG9.PA
+##  Les calculs sont effectués sur le logarithme des prix des ETF 
+
+## a- Modèle ARIMA(6,1,0) et représentation de la fonction de réponse aux impulsions (IRF). 
+
+logs AEME # logarithme des prix de AEME.PA
+
+gnuplot  l_AEME --time-series --with-lines --output=display 
+
+
+## Modèle ARIMA(6,1,0) 
+arima 6 1 0 ; l_AEME # ARIMA(6,1,0) pour l'ETF AEME.PA
+
+
+
+include ARMA_IRF.gfn # Bibliothèque chargée pour la représentation de la fonction de réponse aux impulsions (IRF). 
+
+
+# save the IRF, optionally with associated std. errors
+do_se = 1 # pour voir si on doit répréenter les écartype ou pas
+IRF = woldrep($model, 24, do_se) ## $model : pour les coefficients qui ont été utilisés dans le modèle ARIMA
+# plot the IRF
+bundle b = $model
+wrplot(b, 24)
+
+##################################################
+
+logs CG9  # logarithme des prix de CG9.PA
+
+gnuplot  l_CG9 --time-series --with-lines --output=display
+
+arima 6 1 0 ; l_CG9  # ARIMA(6,1,0) pour l'ETF CG9.PA
+
+
+# save the IRF, optionally with associated std. errors
+do_se = 1 # pour voir si on doit répréenter les écartype ou pas
+IRF = woldrep($model, 24, do_se) ## $model : pour les coefficients qui ont été utilisés dans le modèle ARIMA
+# plot the IRF
+bundle b = $model
+wrplot(b, 24)
+
+## b- Tests de racine-unitaire ADF et KPSS.
+
+# Logarithme naturel des séries
+series l_AEME = log(AEME100)
+series l_CG9 = log(CG9100)
+
+# Rendements géométriques
+series d_l_AEME = diff(l_AEME)
+series d_l_CG9 = diff(l_CG9)
+
+
+print "Tests de racine unitaire"
+print "AEME en log et en diff_log"
+adf 17 l_AEME --c --ct --verbose --test-down=BIC
+adf 17 d_l_AEME --c --ct --verbose --test-down=BIC
+
+kpss 5 l_AEME --verbose
+kpss 5 d_l_AEME --verbose
+
+
+
+print "DAX en log et en diff_log"
+adf 17 l_CG9 --c --ct --verbose --test-down=BIC
+adf 17 d_l_CG9 --c --ct --verbose --test-down=BIC
+
+kpss 5 l_CG9 --verbose  ## Les hypohtèes ici sont inverses avec le test d'ADF
+kpss 5 d_l_CG9 --verbose ## Voir si la série contien une racine unitaire ou non 
+
+# Graphique (en niveau)
+scatters l_AEME; l_CG9 --with-lines --output=display
+
+## c-  Test de cointégration d’Engle et Granger entre les deux ETF
+
+
+print "Test de cointégration de Engle et Granger (EG), précédés par les tests ADF"
+coint 12 l_AEME l_CG9 --test-down=BIC
+
+print "Estimation de la relation de LT (EG) et création du résidu"
+ols l_AEME 0 l_CG9
+series ec = $uhat
+gnuplot ec --time-series --with-lines --output=display
+
+print "Estimation du modèle ECM pour AEME"
+ols d_l_AEME 0 d_l_AEME(-1 to -3) d_l_CG9(-1 to -3) ec(-1) 
+
+print "Estimation d'un modèle VAR en niveau"
+var 12 d_l_AEME d_l_CG9 --lagselect
+var 3 d_l_AEME d_l_CG9 --impulse-responses 
+
+
+
