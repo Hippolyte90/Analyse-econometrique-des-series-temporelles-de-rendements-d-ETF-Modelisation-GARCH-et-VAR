@@ -1,1 +1,1 @@
-# Analyse-econometrique-des-series-temporelles-de-rendements-d-ETF-Modelisation-GARCH-et-VAR
+# Analyse économétrique des séries temporelles de rendements d’ETF : Modélisation GARCH et VAR
